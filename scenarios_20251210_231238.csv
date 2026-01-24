@@ -1,0 +1,6 @@
+scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
+Scenario 1 - Interest Rate Shock,"A severe interest rate shock scenario, simulating a global financial crisis.",stress,,yield_curve,16: Bank EU 17,parallel_shift_bps,500.0,A 50bps parallel shift in the yield curve
+Scenario 2 - Credit Spread Shock,"A credit spread shock scenario, simulating a global economic downturn.",stress,,spread_curve,16: PK bank5 cpty,parallel_shift_bps,300.0,A 30bps parallel shift in the credit spread curve
+Scenario 3 - FX Rate Shock,"An FX rate shock scenario, simulating a sudden currency crisis.",stress,,fx_rate,CHF,parallel_shift_pct,0.1,A 10% parallel shift in the CHF exchange rate
+Scenario 4 - Counterparty Risk Shock,"A counterparty risk shock scenario, simulating a sudden downgrade of key counterparties.",stress,,rating,16: 16: PK bank5 cpty,parallel_shift_bps,-200.0,A 20% downgrade of the PK bank5 cpty rating
+Scenario 4 - Counterparty Risk Shock,"A counterparty risk shock scenario, simulating a sudden downgrade of key counterparties.",stress,,rating,16: Bank EU 17,parallel_shift_bps,-150.0,A 15% downgrade of the Bank EU 17 rating

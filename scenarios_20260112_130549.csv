@@ -1,0 +1,9 @@
+scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
+Scenario_1_Financial_Crisis,Financial crisis with +200 bps rate shock and credit spread widening,stress,,,16:12,parallel_shift_bps,200.0,+200 basis points rate shock
+Scenario_1_Financial_Crisis,Financial crisis with +200 bps rate shock and credit spread widening,stress,,,16:11,parallel_shift_pct,1.2,20% credit spread widening
+Scenario_2_Crisis_CHF_Appreciation,Crisis scenario with CHF appreciation and rate shock,stress,,,CHF,parallel_shift_pct,1.3,+30% CHF appreciation
+Scenario_2_Crisis_CHF_Appreciation,Crisis scenario with CHF appreciation and rate shock,stress,,,16:12,parallel_shift_bps,150.0,+150 basis points rate shock
+Scenario_3_Credit_Crisis,Credit crisis scenario with counterparty rating shocks,stress,,,16:14,parallel_shift_pct,1.5,+50% credit spread widening for PK bank5 cpty
+Scenario_3_Credit_Crisis,Credit crisis scenario with counterparty rating shocks,stress,,,16:15,parallel_shift_pct,1.2,20% credit spread widening for Bank EU 10
+Scenario_4_Macro_Factor_Shock,Macro factor shock scenario with +5% GDP growth rate shock,stress,,,macro_factor,multiplicative,1.05,+5% macro factor shock
+Scenario_5_Yield_Curve_Shift,Yield curve shift scenario with +100 bps yield curve shift,stress,,,yield_curve,parallel_shift_bps,100.0,+100 basis points yield curve shift

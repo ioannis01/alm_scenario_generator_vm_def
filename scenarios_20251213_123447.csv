@@ -1,0 +1,5 @@
+scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
+Scenario 1: Interest Rate Stress,A moderate increase in interest rates across all curves.,stress,,yield_curve,16.12,parallel_shift_bps,100.0,
+Scenario 2: Credit Spread Stress,A significant increase in credit spreads across all counterparty ratings.,stress,,spread_curve,16.12,parallel_shift_bps,500.0,
+Scenario 2: Credit Spread Stress,A significant increase in credit spreads across all counterparty ratings.,stress,,rating,16.11,multiplicative,1.2,
+Scenario 3: FX Rate Stress,A moderate depreciation of the CHF against major currencies.,stress,,fx_rate,CHF,parallel_shift_pct,-5.0,

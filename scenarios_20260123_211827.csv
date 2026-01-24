@@ -1,0 +1,9 @@
+scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
+Scenario_1,Severe rate shock and credit spread widening,stress,,yield_curve,CHF_SWAP,parallel_shift_bps,200.0,Severe rate shock
+Scenario_1,Severe rate shock and credit spread widening,stress,,spread_curve,CHF_CORP_A,parallel_shift_bps,300.0,Credit spread widening
+Scenario_2,Severe rate shock and credit spread widening with FX impact,stress,,yield_curve,CHF_SWAP,parallel_shift_bps,200.0,Severe rate shock
+Scenario_2,Severe rate shock and credit spread widening with FX impact,stress,,spread_curve,CHF_CORP_A,parallel_shift_bps,300.0,Credit spread widening
+Scenario_2,Severe rate shock and credit spread widening with FX impact,stress,,fx_rate,EURCHF,parallel_shift_pct,-0.05,Severe FX shock
+Scenario_3,"Severe rate shock, credit spread widening, and counterparty risk shock",stress,,yield_curve,CHF_SWAP,parallel_shift_bps,200.0,Severe rate shock
+Scenario_3,"Severe rate shock, credit spread widening, and counterparty risk shock",stress,,spread_curve,CHF_CORP_A,parallel_shift_bps,300.0,Credit spread widening
+Scenario_3,"Severe rate shock, credit spread widening, and counterparty risk shock",stress,,counterparty,1,multiplicative,0.8,Counterparty risk shock

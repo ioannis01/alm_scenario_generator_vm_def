@@ -1,0 +1,4 @@
+scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
+Scenario_1_Credit_Stress,Severe credit stress scenario with increased PD values for most counterparties.,stress,,rating,16,parallel_shift_bps,500.0,Downgrade of most counterparties by 5% (50 bps)
+Scenario_2_FX_Rate_Stress,Severe FX rate stress scenario with a sharp depreciation of the CHF.,stress,,fx_rate,CHF,parallel_shift_pct,-20.0,Sharp depreciation of CHF by 20%
+Scenario_3_Yield_Curve_Stress,Severe yield curve stress scenario with a sharp increase in interest rates.,stress,,yield_curve,CHF,parallel_shift_bps,500.0,Sharp increase in CHF interest rates by 5% (50 bps)
