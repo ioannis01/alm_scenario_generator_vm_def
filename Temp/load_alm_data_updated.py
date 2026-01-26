@@ -34,6 +34,15 @@ class RiskProConfig:
     DB_PASSWORD = "RP_1225"
     SCHEMA = "dbo"
     
+    # RiskPro tables that exist:
+    # - CONTRACT
+    # - COUNTERPARTY
+    # - COUNTERPARTY_CLASS
+    # - RATING_CLASS
+    
+    # Note: No OBS_YIELD_CURVE, OBS_SPREAD_CURVE, OBS_FX_RATE tables
+    # So we use sample data for risk factors
+    
     @classmethod
     def get_connection_string(cls) -> str:
         return (
@@ -52,70 +61,7 @@ def get_database_connection():
         logger.info("✓ Connected to RiskPro database")
         return conn
     except Exception as e:
-        logger.error(f"Failed to connect to RiskPro: {e}")
-        raise Exception(f"Database connection failed: {str(e)}")
-
-
-def get_available_model_ids() -> List[Dict[str, Any]]:
-    """
-    Get distinct model_ids from RiskPro database with counts.
-    
-    Returns:
-        List of dicts with model_id, contract_count, counterparty_count
-    
-    Raises:
-        Exception if database query fails
-    """
-    logger.info("Fetching available model IDs from RiskPro...")
-    
-    try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        # Query to get distinct MODEL_ID values with counts
-        query = """
-        SELECT 
-            c.MODEL_ID,
-            COUNT(DISTINCT c.CONTRACT_ID) as contract_count,
-            COUNT(DISTINCT cp.COUNTERPARTY_ID) as counterparty_count
-        FROM dbo.CONTRACT c
-        LEFT JOIN dbo.COUNTERPARTY cp ON c.MODEL_ID = cp.MODEL_ID
-        WHERE c.MODEL_ID IS NOT NULL
-        GROUP BY c.MODEL_ID
-        ORDER BY c.MODEL_ID
-        """
-        
-        logger.info(f"Executing query to fetch model IDs...")
-        cursor.execute(query)
-        
-        models = []
-        for row in cursor.fetchall():
-            model_id = str(row[0]) if row[0] else None
-            if model_id:
-                models.append({
-                    'model_id': model_id,
-                    'contract_count': int(row[1]) if row[1] else 0,
-                    'counterparty_count': int(row[2]) if row[2] else 0
-                })
-        
-        cursor.close()
-        conn.close()
-        
-        if len(models) == 0:
-            logger.warning("⚠ No model IDs found in CONTRACT table")
-            raise Exception("No model IDs found in database. Check if CONTRACT table has MODEL_ID values.")
-        
-        logger.info(f"✓ Found {len(models)} model IDs")
-        for m in models[:5]:  # Log first 5
-            logger.info(f"  - {m['model_id']}: {m['contract_count']} contracts, {m['counterparty_count']} counterparties")
-        
-        return models
-        
-    except pyodbc.Error as e:
-        logger.error(f"Database error fetching model IDs: {e}")
-        raise Exception(f"Database error: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error fetching model IDs: {e}")
+        logger.error(f"Failed to connect: {e}")
         raise
 
 
@@ -173,39 +119,19 @@ def load_counterparty_classes(conn) -> Dict[str, Dict[str, Any]]:
     return classes
 
 
-def load_counterparties(
-    conn, 
-    counterparty_classes: Dict,
-    model_id: Optional[str] = None,
-    limit: Optional[int] = None
-) -> List[Counterparty]:
+def load_counterparties(conn, counterparty_classes: Dict, **kwargs) -> List[Counterparty]:
     """
-    Load counterparties from COUNTERPARTY table with optional filtering.
-    
-    Args:
-        conn: Database connection
-        counterparty_classes: Dict of counterparty class definitions
-        model_id: Optional model ID to filter by
-        limit: Optional maximum number of records to load
-    
-    Returns:
-        List of Counterparty objects
+    Load counterparties from COUNTERPARTY table with enhanced attributes.
+    Enriched with counterparty class information.
     """
     logger.info("Loading counterparties from RiskPro...")
-    if model_id:
-        logger.info(f"  Filtering by MODEL_ID = '{model_id}'")
-    if limit:
-        logger.info(f"  Limiting to {limit} records")
     
     counterparties = []
     cursor = conn.cursor()
     
-    # Build query with optional filters
-    top_clause = f"TOP {limit}" if limit else "TOP 10000"
-    where_clause = f"WHERE MODEL_ID = ?" if model_id else ""
-    
-    query = f"""
-    SELECT {top_clause}
+    # Build query with optional model_id filter
+    base_query = """
+    SELECT TOP {limit}
         COUNTERPARTY_ID,
         SEGMENT,
         LEGAL_COUNTRY,
@@ -221,14 +147,16 @@ def load_counterparties(
         REGION
     FROM dbo.COUNTERPARTY
     {where_clause}
-    ORDER BY COUNTERPARTY_ID
     """
     
+    limit = kwargs.get('limit', 10000)
+    model_id = kwargs.get('model_id')
+    
+    where_clause = f"WHERE MODEL_ID = '{model_id}'" if model_id else ""
+    query = base_query.format(limit=limit, where_clause=where_clause)
+    
     try:
-        if model_id:
-            cursor.execute(query, (model_id,))
-        else:
-            cursor.execute(query)
+        cursor.execute(query)
         
         for row in cursor.fetchall():
             counterparty_id = str(row[0]) if row[0] else None
@@ -274,17 +202,12 @@ def load_counterparties(
             
             counterparties.append(counterparty)
         
-        if len(counterparties) == 0:
-            warning_msg = f"No counterparties found"
-            if model_id:
-                warning_msg += f" for MODEL_ID = '{model_id}'"
-            logger.warning(f"⚠ {warning_msg}")
-        else:
-            logger.info(f"✓ Loaded {len(counterparties)} counterparties")
-            
+        logger.info(f"✓ Loaded {len(counterparties)} counterparties")
     except Exception as e:
         logger.error(f"✗ Could not load counterparties: {e}")
-        raise Exception(f"Error loading counterparties: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise
     finally:
         cursor.close()
     
@@ -319,37 +242,24 @@ def map_contract_type(product_type: str) -> ContractType:
     return ContractType.LOAN
 
 
-def load_contracts(
-    conn,
-    model_id: Optional[str] = None,
-    limit: Optional[int] = None
-) -> List[Contract]:
+def load_contracts(conn, limit: Optional[int] = None, **kwargs) -> List[Contract]:
     """
-    Load contracts from CONTRACT table with optional filtering.
-    
-    Args:
-        conn: Database connection
-        model_id: Optional model ID to filter by
-        limit: Optional maximum number of records to load
-    
-    Returns:
-        List of Contract objects
+    Load contracts from CONTRACT table with enhanced attributes.
+    Includes valuation, credit risk, and product classification details.
     """
     logger.info("Loading contracts from RiskPro...")
-    if model_id:
-        logger.info(f"  Filtering by MODEL_ID = '{model_id}'")
-    if limit:
-        logger.info(f"  Limiting to {limit} records")
     
     contracts = []
     cursor = conn.cursor()
     
-    # Build query with optional filters
-    top_clause = f"TOP {limit}" if limit else "TOP 1000"
-    where_clause = f"WHERE MODEL_ID = ?" if model_id else ""
+    limit_clause = f"TOP {limit}" if limit else "TOP 1000"
+    
+    # Add model_id filter if provided
+    model_id = kwargs.get('model_id')
+    where_clause = f"WHERE MODEL_ID = '{model_id}'" if model_id else ""
     
     query = f"""
-    SELECT {top_clause}
+    SELECT {limit_clause}
         CONTRACT_ID,
         MODEL_ID,
         IP_TYPE_ID,
@@ -371,13 +281,10 @@ def load_contracts(
     FROM dbo.CONTRACT
     {where_clause}
     ORDER BY CONTRACT_ID
-    """
+    """.format(where_clause=where_clause)
     
     try:
-        if model_id:
-            cursor.execute(query, (model_id,))
-        else:
-            cursor.execute(query)
+        cursor.execute(query)
         
         for row in cursor.fetchall():
             contract_id = str(row[0]) if row[0] else None
@@ -439,17 +346,12 @@ def load_contracts(
             
             contracts.append(contract)
         
-        if len(contracts) == 0:
-            warning_msg = f"No contracts found"
-            if model_id:
-                warning_msg += f" for MODEL_ID = '{model_id}'"
-            logger.warning(f"⚠ {warning_msg}")
-        else:
-            logger.info(f"✓ Loaded {len(contracts)} contracts")
-            
+        logger.info(f"✓ Loaded {len(contracts)} contracts")
     except Exception as e:
         logger.error(f"✗ Could not load contracts: {e}")
-        raise Exception(f"Error loading contracts: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise
     finally:
         cursor.close()
     
@@ -457,21 +359,20 @@ def load_contracts(
 
 
 def load_from_riskpro(
-    model_id: Optional[str] = None,
-    limit_contracts: Optional[int] = None
+    limit_contracts: Optional[int] = None,
+    model_id: Optional[str] = None
 ) -> Tuple[List[RiskFactor], List[Counterparty], List[Contract]]:
     """
-    Load ALM data using hybrid approach with filtering.
+    Load ALM data using hybrid approach:
+    - Sample risk factors (RiskPro doesn't have OBS_* tables)
+    - Real counterparties from COUNTERPARTY table
+    - Real contracts from CONTRACT table
     
     Args:
-        model_id: Optional model ID to filter contracts and counterparties
-        limit_contracts: Optional limit on number of contracts/counterparties
+        limit_contracts: Optional limit on number of contracts
     
     Returns:
         Tuple of (risk_factors, counterparties, contracts)
-    
-    Raises:
-        Exception if loading fails
     """
     logger.info("=" * 80)
     logger.info("LOADING HYBRID ALM DATA FROM RISKPRO")
@@ -480,7 +381,7 @@ def load_from_riskpro(
     if model_id:
         logger.info(f"Model ID filter: {model_id}")
     if limit_contracts:
-        logger.info(f"Record limit: {limit_contracts}")
+        logger.info(f"Contract limit: {limit_contracts}")
     logger.info("")
     logger.info("Data Sources:")
     logger.info("  • Risk Factors: Sample data (create_sample_universe)")
@@ -497,31 +398,12 @@ def load_from_riskpro(
         logger.info("Connecting to RiskPro database...")
         conn = get_database_connection()
         
-        # Step 3: Load RiskPro data with filters
+        # Step 3: Load RiskPro data
         counterparty_classes = load_counterparty_classes(conn)
-        counterparties = load_counterparties(
-            conn, 
-            counterparty_classes,
-            model_id=model_id,
-            limit=limit_contracts
-        )
-        contracts = load_contracts(
-            conn,
-            model_id=model_id,
-            limit=limit_contracts
-        )
+        counterparties = load_counterparties(conn, counterparty_classes, model_id=model_id, limit=limit_contracts or 10000)
+        contracts = load_contracts(conn, limit=limit_contracts, model_id=model_id)
         
         conn.close()
-        
-        # Validate that we actually loaded data
-        if len(contracts) == 0 and len(counterparties) == 0:
-            error_msg = "No data loaded"
-            if model_id:
-                error_msg += f" for model_id '{model_id}'. Check if this model exists in the database."
-            else:
-                error_msg += ". Check database connectivity and table contents."
-            logger.error(f"✗ {error_msg}")
-            raise Exception(error_msg)
         
         logger.info("")
         logger.info("=" * 80)
@@ -547,40 +429,37 @@ if __name__ == "__main__":
     print()
     
     try:
-        # Test 1: Get available models
-        print("\n--- Test 1: Get Available Model IDs ---")
-        models = get_available_model_ids()
-        print(f"Found {len(models)} models:")
-        for m in models[:5]:
-            print(f"  {m['model_id']}: {m['contract_count']} contracts, {m['counterparty_count']} counterparties")
+        risk_factors, counterparties, contracts = load_from_riskpro(limit_contracts=10)
         
-        # Test 2: Load with first model
-        if models:
-            test_model_id = models[0]['model_id']
-            print(f"\n--- Test 2: Load Data for Model '{test_model_id}' ---")
-            risk_factors, counterparties, contracts = load_from_riskpro(
-                model_id=test_model_id,
-                limit_contracts=10
-            )
-            
-            print(f"\nLoaded:")
-            print(f"  Risk Factors: {len(risk_factors)}")
-            print(f"  Counterparties: {len(counterparties)}")
-            print(f"  Contracts: {len(contracts)}")
-            
-            if counterparties:
-                print(f"\nFirst counterparty:")
-                cp = counterparties[0]
-                print(f"  ID: {cp.counterparty_id}")
-                print(f"  Name: {cp.name}")
-                print(f"  Model ID: {cp.extended_attributes.get('model_id')}")
-            
-            if contracts:
-                print(f"\nFirst contract:")
-                ct = contracts[0]
-                print(f"  ID: {ct.contract_id}")
-                print(f"  Type: {ct.contract_type}")
-                print(f"  Model ID: {ct.extended_attributes.get('model_id')}")
+        print("\n" + "=" * 80)
+        print("SAMPLE DATA")
+        print("=" * 80)
+        
+        if risk_factors:
+            print(f"\nFirst risk factor:")
+            print(f"  {risk_factors[0].to_dict()}")
+        
+        if counterparties:
+            print(f"\nFirst counterparty:")
+            cp = counterparties[0]
+            print(f"  ID: {cp.counterparty_id}")
+            print(f"  Name: {cp.name}")
+            print(f"  Rating: {cp.rating}")
+            print(f"  PD: {cp.pd:.4f}")
+            if hasattr(cp, 'extended_attributes'):
+                print(f"  Segment: {cp.extended_attributes.get('segment')}")
+                print(f"  NPL: {cp.extended_attributes.get('is_non_performing')}")
+        
+        if contracts:
+            print(f"\nFirst contract:")
+            ct = contracts[0]
+            print(f"  ID: {ct.contract_id}")
+            print(f"  Type: {ct.contract_type}")
+            print(f"  Notional: {ct.notional:,.2f}")
+            if hasattr(ct, 'extended_attributes'):
+                print(f"  Product: {ct.extended_attributes.get('product_type')}")
+                print(f"  Segment: {ct.extended_attributes.get('segment')}")
+                print(f"  Book Value: {ct.extended_attributes.get('book_value'):,.2f}")
             
     except Exception as e:
         print(f"\n✗ Error: {e}")

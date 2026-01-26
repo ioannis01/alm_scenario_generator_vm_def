@@ -1,5 +1,0 @@
-scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
-Scenario 1: Credit Stress,A credit stress scenario where counterparty ratings are downgraded.,stress,,rating,16,,0.5,Downgrade of 50% for all counterparty ratings
-Scenario 2: Market Stress,A market stress scenario where interest rates and credit spreads increase.,stress,,yield_curve,16,,200.0,+200bps shift in the yield curve
-Scenario 2: Market Stress,A market stress scenario where interest rates and credit spreads increase.,stress,,spread_curve,16,,100.0,+100bps shift in the spread curve
-Scenario 3: Liquidity Stress,A liquidity stress scenario where funding costs increase.,stress,,fx_rate,CHF,,0.8,-20% shock in the CHF exchange rate

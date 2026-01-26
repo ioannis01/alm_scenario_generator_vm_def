@@ -1,5 +1,0 @@
-scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
-Financial Crisis,A severe financial crisis with a +200 bps rate shock and credit spread widening.,stress,,yield_curve,16:1.00%,parallel_shift_bps,200.0,
-Credit Crisis,A severe credit crisis with a widening of credit spreads and increased PD values.,stress,,rating,16:12 (Gov FR cpty),parallel_shift_pct,0.5,
-Credit Crisis,A severe credit crisis with a widening of credit spreads and increased PD values.,stress,,rating,16:13 (Bank EU 17),parallel_shift_pct,0.5,
-Currency Crisis,A severe currency crisis with a CHF appreciation shock.,stress,,fx_rate,CHF,parallel_shift_pct,0.05,

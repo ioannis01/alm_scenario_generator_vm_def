@@ -1,6 +1,0 @@
-scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
-Scenario 1: Rate Shock,Severe rate shock scenario with +200bps yield curve shift,stress,,yield_curve,16.37,parallel_shift_bps,200,+200bps rate shock
-Scenario 2: Credit Stress,Severe credit stress scenario with +100bps counterparty rating shocks,stress,,rating,16.12,parallel_shift_bps,100,+100bps credit shock
-Scenario 2: Credit Stress,Severe credit stress scenario with +100bps counterparty rating shocks,stress,,rating,16.15,parallel_shift_bps,100,+100bps credit shock
-Scenario 3: Multi-Factor Stress,Severe multi-factor stress scenario with +200bps rate shock and +50bps credit spread widening,stress,,yield_curve,16.37,parallel_shift_bps,200,+200bps rate shock
-Scenario 3: Multi-Factor Stress,Severe multi-factor stress scenario with +200bps rate shock and +50bps credit spread widening,stress,,spread_curve,16.12,parallel_shift_bps,50,+50bps credit spread widening

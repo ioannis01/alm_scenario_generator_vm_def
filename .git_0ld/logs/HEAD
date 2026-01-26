@@ -1,5 +1,0 @@
-0000000000000000000000000000000000000000 f4360e46e6b0c16c0a27b9a23b53ca6691e1355e Ioannis Akkizidis <ioannis.akkizidis@uzh.ch> 1766047479 +0100	commit (initial): Initial commit of WSL ALM scenario generator
-f4360e46e6b0c16c0a27b9a23b53ca6691e1355e f53cf284951fb0cdb0bd30844aeaadadedd430e7 Ioannis Akkizidis <ioannis.akkizidis@uzh.ch> 1766048182 +0100	commit (merge): Merge branch 'main' of https://gitlab.uzh.ch/ioannis.akkizidis/alm-scenario-generator-wsl
-f53cf284951fb0cdb0bd30844aeaadadedd430e7 d18259bce319b9c4144d5c7d6530eccd52ac3014 Ioannis Akkizidis <ioannis.akkizidis@uzh.ch> 1766048360 +0100	commit: Ignore Windows Zone.Identifier metadata files
-d18259bce319b9c4144d5c7d6530eccd52ac3014 0000000000000000000000000000000000000000 Ioannis Akkizidis <ioannis.akkizidis@uzh.ch> 1768222515 +0100	Branch: renamed refs/heads/main to refs/heads/main
-d18259bce319b9c4144d5c7d6530eccd52ac3014 d18259bce319b9c4144d5c7d6530eccd52ac3014 Ioannis Akkizidis <ioannis.akkizidis@uzh.ch> 1768222515 +0100	Branch: renamed refs/heads/main to refs/heads/main

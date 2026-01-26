@@ -1,0 +1,10 @@
+scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
+Scenario 1: Severe Rate Shock,"A severe interest rate shock with a +200bps parallel shift, accompanied by a widening of credit spreads and a decline in equity markets.",stress,,yield_curve,CHF_SWAP,parallel_shift_bps,200.0,
+Scenario 1: Severe Rate Shock,"A severe interest rate shock with a +200bps parallel shift, accompanied by a widening of credit spreads and a decline in equity markets.",stress,,spread_curve,CHF_CORP_A,parallel_shift_bps,100.0,
+Scenario 1: Severe Rate Shock,"A severe interest rate shock with a +200bps parallel shift, accompanied by a widening of credit spreads and a decline in equity markets.",stress,,equity_index,SMI,multiplicative,0.7,
+Scenario 2: Credit Spread Shock,"A severe credit spread widening shock, accompanied by a decline in equity markets and a flattening of the yield curve.",stress,,spread_curve,CHF_CORP_A,parallel_shift_bps,200.0,
+Scenario 2: Credit Spread Shock,"A severe credit spread widening shock, accompanied by a decline in equity markets and a flattening of the yield curve.",stress,,equity_index,SMI,multiplicative,0.8,
+Scenario 2: Credit Spread Shock,"A severe credit spread widening shock, accompanied by a decline in equity markets and a flattening of the yield curve.",stress,,yield_curve,CHF_SWAP,parallel_shift_bps,-50.0,
+Scenario 3: FX Rate Shock,"A severe CHF appreciation shock, accompanied by a widening of credit spreads and a decline in equity markets.",stress,,fx_rate,EURCHF,multiplicative,1.15,
+Scenario 3: FX Rate Shock,"A severe CHF appreciation shock, accompanied by a widening of credit spreads and a decline in equity markets.",stress,,spread_curve,CHF_CORP_A,parallel_shift_bps,100.0,
+Scenario 3: FX Rate Shock,"A severe CHF appreciation shock, accompanied by a widening of credit spreads and a decline in equity markets.",stress,,equity_index,SMI,multiplicative,0.75,

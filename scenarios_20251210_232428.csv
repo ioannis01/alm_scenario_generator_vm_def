@@ -1,5 +1,0 @@
-scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
-Scenario 1 - Interest Rate Shock,A severe interest rate shock scenario where short-term rates increase by 200bps.,stress,,yield_curve,16,parallel_shift_bps,200.0,Severe interest rate shock
-Scenario 2 - Credit Spread Shock,"A credit spread shock scenario where counterparty ratings decrease, increasing PD values.",stress,,rating,16.12,parallel_shift_pct,0.5,Counterparty rating decrease
-Scenario 2 - Credit Spread Shock,"A credit spread shock scenario where counterparty ratings decrease, increasing PD values.",stress,,rating,16.13,parallel_shift_pct,1.2,Counterparty rating decrease
-Scenario 3 - FX Rate Shock,A severe FX rate shock scenario where major currencies experience a sharp depreciation.,stress,,fx_rate,CHF,parallel_shift_pct,0.8,Sharp CHF depreciation

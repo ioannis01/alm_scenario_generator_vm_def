@@ -1,7 +1,0 @@
-scenario_name,scenario_description,scenario_type,probability,factor_type,factor_id,shock_type,shock_value,shock_description
-Scenario_1,Severe stress scenario 1: Rate shock and credit spread widening,stress,,yield_curve,16,parallel_shift_bps,200,Rate shock
-Scenario_1,Severe stress scenario 1: Rate shock and credit spread widening,stress,,spread_curve,16,parallel_shift_bps,100,Credit spread widening for Bank EU 16
-Scenario_2,Severe stress scenario 2: Rate shock and credit spread widening,stress,,yield_curve,12,parallel_shift_bps,200,Rate shock
-Scenario_2,Severe stress scenario 2: Rate shock and credit spread widening,stress,,spread_curve,16,parallel_shift_bps,150,Credit spread widening for Gov FR cpty
-Scenario_3,Severe stress scenario 3: Rate shock and credit spread widening,stress,,yield_curve,17,parallel_shift_bps,200,Rate shock
-Scenario_3,Severe stress scenario 3: Rate shock and credit spread widening,stress,,spread_curve,16,parallel_shift_bps,120,Credit spread widening for Bank EU 17
