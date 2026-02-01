@@ -29,9 +29,9 @@ class RiskProConfig:
     DB_TYPE = "sqlserver"
     DB_HOST = "127.0.0.1"  # localhost works from WSL2
     DB_PORT = 1433
-    DB_NAME = "RP_1225"
-    DB_USER = "RP_1225"
-    DB_PASSWORD = "RP_1225"
+    DB_NAME = "RP_141301"       # "RP_1225"
+    DB_USER = "sa"              # "RP_1225"
+    DB_PASSWORD = "2F@st4u2c"   # "RP_1225"
     SCHEMA = "dbo"
     
     @classmethod
