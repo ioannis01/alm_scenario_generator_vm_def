@@ -1,11 +1,11 @@
 """
-Regnology Risk Hub ALM Data Loader - EXTENDED VERSION
+RiskPro ALM Data Loader - EXTENDED VERSION
 
 Supports loading from multiple sources:
-- Risk Factors: Regnology Risk Hub DB (RES_DIM_* tables) OR sample data
-- Counterparties: Regnology Risk Hub DB (COUNTERPARTY table)
-- Contracts: Regnology Risk Hub DB (CONTRACT table)
-- Counterparty Classes: Regnology Risk Hub DB (COUNTERPARTY_CLASS table)
+- Risk Factors: RiskPro DB (RES_DIM_* tables) OR sample data
+- Counterparties: RiskPro DB (COUNTERPARTY table)
+- Contracts: RiskPro DB (CONTRACT table)
+- Counterparty Classes: RiskPro DB (COUNTERPARTY_CLASS table)
 
 Author: ALM Risk Engineering Team
 """
@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Any
 import logging
 
-from xml_loader_dynamic import load_from_xml as load_from_xml_files
+from xml_loader import load_from_xml as load_from_xml_files
 
 import pyodbc
 from alm_scenarios.models import (
@@ -27,8 +27,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class RegnologyRiskHubConfig:
-    """Configuration for Regnology Risk Hub database connection"""
+class RiskProConfig:
+    """Configuration for RiskPro database connection"""
     DB_TYPE = "sqlserver"
     DB_HOST = "127.0.0.1"  # localhost works from WSL2
     DB_PORT = 1433
@@ -49,19 +49,19 @@ class RegnologyRiskHubConfig:
 
 
 def get_database_connection():
-    """Establish connection to Regnology Risk Hub database"""
+    """Establish connection to RiskPro database"""
     try:
-        conn = pyodbc.connect(RegnologyRiskHubConfig.get_connection_string())
-        logger.info("✓ Connected to Regnology Risk Hub database")
+        conn = pyodbc.connect(RiskProConfig.get_connection_string())
+        logger.info("✓ Connected to RiskPro database")
         return conn
     except Exception as e:
-        logger.error(f"Failed to connect to Regnology Risk Hub: {e}")
+        logger.error(f"Failed to connect to RiskPro: {e}")
         raise Exception(f"Database connection failed: {str(e)}")
 
 
 def get_available_model_ids() -> List[Dict[str, Any]]:
     """
-    Get distinct model_ids from Regnology Risk Hub database with counts.
+    Get distinct model_ids from RiskPro database with counts.
     
     Returns:
         List of dicts with model_id, contract_count, counterparty_count
@@ -69,7 +69,7 @@ def get_available_model_ids() -> List[Dict[str, Any]]:
     Raises:
         Exception if database query fails
     """
-    logger.info("Fetching available model IDs from Regnology Risk Hub...")
+    logger.info("Fetching available model IDs from RiskPro...")
     
     try:
         conn = get_database_connection()
@@ -126,7 +126,7 @@ def load_sample_risk_factors() -> List[RiskFactor]:
     """
     Load sample risk factors using create_sample_universe().
     
-    Used as fallback when Regnology Risk Hub risk factor tables are not available
+    Used as fallback when RiskPro risk factor tables are not available
     or user chooses not to load from database.
     """
     logger.info("Loading sample risk factors (create_sample_universe)...")
@@ -144,9 +144,9 @@ def load_risk_factors_from_db(
     limit: Optional[int] = None
 ) -> List[RiskFactor]:
     """
-    Load risk factors from Regnology Risk Hub dimension tables.
+    Load risk factors from RiskPro dimension tables.
     
-    NOTE: As of current Regnology Risk Hub schema, the RES_DIM_* tables for risk factors
+    NOTE: As of current RiskPro schema, the RES_DIM_* tables for risk factors
     are not available. This function will raise an exception to trigger
     fallback to sample risk factors.
     
@@ -174,17 +174,17 @@ def load_risk_factors_from_db(
     logger.info("=" * 60)
     
     raise Exception(
-        "No RES_DIM_* tables are available in the current Regnology Risk Hub schema. "
+        "No RES_DIM_* tables are available in the current RiskPro schema. "
         "The system will use sample risk factors instead."
     )
 
 
 def map_risk_factor_type(riskpro_type: str) -> str:
     """
-    Map Regnology Risk Hub risk factor type to internal factor_type.
+    Map RiskPro risk factor type to internal factor_type.
     
     Args:
-        riskpro_type: Type string from Regnology Risk Hub
+        riskpro_type: Type string from RiskPro
         
     Returns:
         Standardized factor_type
@@ -267,7 +267,7 @@ def load_counterparties(
     Returns:
         List of Counterparty objects
     """
-    logger.info("Loading counterparties from Regnology Risk Hub...")
+    logger.info("Loading counterparties from RiskPro...")
     if model_id:
         logger.info(f"  Filtering by MODEL_ID = '{model_id}'")
     if limit:
@@ -365,7 +365,7 @@ def load_counterparties(
 
 
 def map_contract_type(product_type: Optional[str]) -> ContractType:
-    """Map Regnology Risk Hub product type to ContractType enum"""
+    """Map RiskPro product type to ContractType enum"""
     if not product_type:
         return ContractType.LOAN  # Default to LOAN instead of GENERIC
     
@@ -403,7 +403,7 @@ def load_contracts(
     Returns:
         List of Contract objects
     """
-    logger.info("Loading contracts from Regnology Risk Hub...")
+    logger.info("Loading contracts from RiskPro...")
     if model_id:
         logger.info(f"  Filtering by MODEL_ID = '{model_id}'")
     if limit:
@@ -537,7 +537,7 @@ def load_from_riskpro(
     Args:
         model_id: Optional model ID to filter contracts and counterparties
         limit_contracts: Optional limit on number of contracts/counterparties
-        load_risk_factors_from_db_flag: If True, load from Regnology Risk Hub DB; else use sample data
+        load_risk_factors_from_db_flag: If True, load from RiskPro DB; else use sample data
         load_counterparties_flag: If True, load counterparties
         load_contracts_flag: If True, load contracts
     
@@ -550,7 +550,7 @@ def load_from_riskpro(
     logger.info("=" * 80)
     logger.info("LOADING ALM DATA FROM RISKPRO")
     logger.info("=" * 80)
-    logger.info(f"Database: {RegnologyRiskHubConfig.DB_NAME} @ {RegnologyRiskHubConfig.DB_HOST}")
+    logger.info(f"Database: {RiskProConfig.DB_NAME} @ {RiskProConfig.DB_HOST}")
     if model_id:
         logger.info(f"Model ID filter: {model_id}")
     if limit_contracts:
@@ -564,7 +564,7 @@ def load_from_riskpro(
     
     try:
         # Connect to RiskPro
-        logger.info("Connecting to Regnology Risk Hub database...")
+        logger.info("Connecting to RiskPro database...")
         conn = get_database_connection()
         
         # Step 1: Load risk factors
@@ -654,7 +654,7 @@ def load_alm_data(
     Unified ALM data loader - supports both database and XML sources.
     
     Args:
-        source: "db" for Regnology Risk Hub database, "xml" for XML files
+        source: "db" for RiskPro database, "xml" for XML files
         
         # DB parameters (when source="db"):
         model_id: Optional model ID filter
@@ -677,7 +677,7 @@ def load_alm_data(
         ValueError: If source is invalid or required files are missing
     """
     if source == "db":
-        logger.info("Loading from Regnology Risk Hub database...")
+        logger.info("Loading from RiskPro database...")
         return load_from_riskpro(
             model_id=model_id,
             limit_contracts=limit_contracts,

@@ -103,43 +103,31 @@ Generate realistic, internally consistent scenarios based on historical preceden
         for factor_type, factors in by_type.items():
             summary_lines.append(f"\n{factor_type.value.upper()}:")
             for factor in factors:
-                try:
-                    factor_dict = factor.to_dict()
-                    if isinstance(factor, YieldCurve):
-                        avg_rate = factor_dict.get('avg_rate')
-                        avg_rate_str = f"{avg_rate:.2f}%" if avg_rate is not None else "N/A"
-                        summary_lines.append(
-                            f"  - {factor.factor_id} ({factor.currency}): "
-                            f"avg rate = {avg_rate_str}, "
-                            f"tenors = {len(factor.tenors) if factor.tenors else 0}"
-                        )
-                    elif isinstance(factor, SpreadCurve):
-                        avg_spread = factor_dict.get('avg_spread_bps')
-                        avg_spread_str = f"{avg_spread:.0f} bps" if avg_spread is not None else "N/A"
-                        summary_lines.append(
-                            f"  - {factor.factor_id} ({factor.currency}, {factor.rating or 'N/A'}): "
-                            f"avg spread = {avg_spread_str}"
-                        )
-                    elif isinstance(factor, FXRate):
-                        spot_rate = factor.spot_rate if factor.spot_rate is not None else 0
-                        summary_lines.append(
-                            f"  - {factor.factor_id}: {spot_rate:.4f}"
-                        )
-                    elif isinstance(factor, EquityIndex):
-                        current_level = factor.current_level if factor.current_level is not None else 0
-                        summary_lines.append(
-                            f"  - {factor.factor_id}: level = {current_level:.2f}"
-                        )
-                    elif isinstance(factor, MacroFactor):
-                        current_value = factor.current_value if factor.current_value is not None else 0
-                        unit = factor.unit if factor.unit else ""
-                        summary_lines.append(
-                            f"  - {factor.factor_id} ({factor.macro_type}): "
-                            f"{current_value:.2f}{unit}"
-                        )
-                except Exception as e:
-                    # If any error, just show basic info
-                    summary_lines.append(f"  - {factor.factor_id}: [Error: {str(e)}]")
+                factor_dict = factor.to_dict()
+                if isinstance(factor, YieldCurve):
+                    summary_lines.append(
+                        f"  - {factor.factor_id} ({factor.currency}): "
+                        f"avg rate = {factor_dict['avg_rate']:.2f}%, "
+                        f"tenors = {len(factor.tenors)}"
+                    )
+                elif isinstance(factor, SpreadCurve):
+                    summary_lines.append(
+                        f"  - {factor.factor_id} ({factor.currency}, {factor.rating}): "
+                        f"avg spread = {factor_dict['avg_spread_bps']:.0f} bps"
+                    )
+                elif isinstance(factor, FXRate):
+                    summary_lines.append(
+                        f"  - {factor.factor_id}: {factor.spot_rate:.4f}"
+                    )
+                elif isinstance(factor, EquityIndex):
+                    summary_lines.append(
+                        f"  - {factor.factor_id}: level = {factor.current_level:.2f}"
+                    )
+                elif isinstance(factor, MacroFactor):
+                    summary_lines.append(
+                        f"  - {factor.factor_id} ({factor.macro_type}): "
+                        f"{factor.current_value:.2f}{factor.unit}"
+                    )
         
         return "\n".join(summary_lines)
     
@@ -150,15 +138,10 @@ Generate realistic, internally consistent scenarios based on historical preceden
         
         # Show first 10, then summarize
         for i, cp in enumerate(counterparties[:10]):
-            # Handle None values safely
-            rating_str = cp.rating if cp.rating else "N/A"
-            pd_str = f"{cp.pd*100:.2f}%" if cp.pd is not None else "N/A"
-            recovery_str = f"{cp.recovery_rate*100:.0f}%" if cp.recovery_rate is not None else "N/A"
-            
             summary_lines.append(
                 f"  - {cp.counterparty_id} ({cp.name}): "
-                f"Rating={rating_str}, PD={pd_str}, "
-                f"Recovery={recovery_str}"
+                f"Rating={cp.rating}, PD={cp.pd*100:.2f}%, "
+                f"Recovery={cp.recovery_rate*100:.0f}%"
             )
         
         if len(counterparties) > 10:
@@ -179,23 +162,17 @@ Generate realistic, internally consistent scenarios based on historical preceden
             ct = contract.contract_type.value
             by_type[ct] = by_type.get(ct, 0) + 1
             
-            # Handle None notional safely
-            if contract.notional is not None:
-                notional = contract.notional if contract.is_asset else -contract.notional
-                by_currency[contract.currency] = by_currency.get(contract.currency, 0) + notional
+            notional = contract.notional if contract.is_asset else -contract.notional
+            by_currency[contract.currency] = by_currency.get(contract.currency, 0) + notional
         
         summary_lines.append(f"  Total contracts: {len(contracts)}")
         summary_lines.append("  By type:")
         for ctype, count in sorted(by_type.items(), key=lambda x: -x[1]):
             summary_lines.append(f"    - {ctype}: {count}")
         
-        if by_currency:  # Only show if we have notional data
-            summary_lines.append("  Net notional by currency:")
-            for curr, notional in sorted(by_currency.items(), key=lambda x: -abs(x[1])):
-                summary_lines.append(f"    - {curr}: {notional:,.0f}")
-        else:
-            summary_lines.append("  Net notional: N/A (no notional data available)")
-
+        summary_lines.append("  Net notional by currency:")
+        for curr, notional in sorted(by_currency.items(), key=lambda x: -abs(x[1])):
+            summary_lines.append(f"    - {curr}: {notional:,.0f}")
         
         return "\n".join(summary_lines)
     

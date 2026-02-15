@@ -1,11 +1,11 @@
 """
-Regnology Risk Hub ALM Data Loader - EXTENDED VERSION
+RiskPro ALM Data Loader - EXTENDED VERSION
 
 Supports loading from multiple sources:
-- Risk Factors: Regnology Risk Hub DB (RES_DIM_* tables) OR sample data
-- Counterparties: Regnology Risk Hub DB (COUNTERPARTY table)
-- Contracts: Regnology Risk Hub DB (CONTRACT table)
-- Counterparty Classes: Regnology Risk Hub DB (COUNTERPARTY_CLASS table)
+- Risk Factors: RiskPro DB (RES_DIM_* tables) OR sample data
+- Counterparties: RiskPro DB (COUNTERPARTY table)
+- Contracts: RiskPro DB (CONTRACT table)
+- Counterparty Classes: RiskPro DB (COUNTERPARTY_CLASS table)
 
 Author: ALM Risk Engineering Team
 """
@@ -14,21 +14,18 @@ from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Any
 import logging
 
-from xml_loader_dynamic import load_from_xml as load_from_xml_files
-
 import pyodbc
 from alm_scenarios.models import (
     RiskFactor, Counterparty, Contract, ContractType
 )
 from alm_scenarios.utils.sample_data import create_sample_universe
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class RegnologyRiskHubConfig:
-    """Configuration for Regnology Risk Hub database connection"""
+class RiskProConfig:
+    """Configuration for RiskPro database connection"""
     DB_TYPE = "sqlserver"
     DB_HOST = "127.0.0.1"  # localhost works from WSL2
     DB_PORT = 1433
@@ -49,19 +46,19 @@ class RegnologyRiskHubConfig:
 
 
 def get_database_connection():
-    """Establish connection to Regnology Risk Hub database"""
+    """Establish connection to RiskPro database"""
     try:
-        conn = pyodbc.connect(RegnologyRiskHubConfig.get_connection_string())
-        logger.info("✓ Connected to Regnology Risk Hub database")
+        conn = pyodbc.connect(RiskProConfig.get_connection_string())
+        logger.info("✓ Connected to RiskPro database")
         return conn
     except Exception as e:
-        logger.error(f"Failed to connect to Regnology Risk Hub: {e}")
+        logger.error(f"Failed to connect to RiskPro: {e}")
         raise Exception(f"Database connection failed: {str(e)}")
 
 
 def get_available_model_ids() -> List[Dict[str, Any]]:
     """
-    Get distinct model_ids from Regnology Risk Hub database with counts.
+    Get distinct model_ids from RiskPro database with counts.
     
     Returns:
         List of dicts with model_id, contract_count, counterparty_count
@@ -69,7 +66,7 @@ def get_available_model_ids() -> List[Dict[str, Any]]:
     Raises:
         Exception if database query fails
     """
-    logger.info("Fetching available model IDs from Regnology Risk Hub...")
+    logger.info("Fetching available model IDs from RiskPro...")
     
     try:
         conn = get_database_connection()
@@ -126,7 +123,7 @@ def load_sample_risk_factors() -> List[RiskFactor]:
     """
     Load sample risk factors using create_sample_universe().
     
-    Used as fallback when Regnology Risk Hub risk factor tables are not available
+    Used as fallback when RiskPro risk factor tables are not available
     or user chooses not to load from database.
     """
     logger.info("Loading sample risk factors (create_sample_universe)...")
@@ -144,47 +141,298 @@ def load_risk_factors_from_db(
     limit: Optional[int] = None
 ) -> List[RiskFactor]:
     """
-    Load risk factors from Regnology Risk Hub dimension tables.
+    Load risk factors from RiskPro dimension tables.
     
-    NOTE: As of current Regnology Risk Hub schema, the RES_DIM_* tables for risk factors
-    are not available. This function will raise an exception to trigger
-    fallback to sample risk factors.
+    RiskPro/OneSumX stores risk factors across multiple dimension tables:
+    - RES_DIM_*_RISK_FACTOR: Generic risk factors
+    - RES_DIM_*_CURVE: Yield/spread curves
+    - RES_DIM_*_INDEX: Equity/commodity indices
+    - RES_DIM_*_SURF: Volatility surfaces
     
-    Previously attempted tables (now removed):
-    - RES_DIM_RISK_FACTOR
-    - RES_DIM_CURVE
-    - RES_DIM_INDEX
-    - RES_DIM_SURF
+    They are grouped using:
+    - RES_DIM_*_VAR_GROUP: Risk factor groupings
+    - RES_DIM_MATRIX_CODE: Matrix codes for factor relationships
     
     Args:
-        conn: Database connection (unused in current implementation)
-        model_id: Optional model ID filter (unused in current implementation)
-        limit: Optional limit on records (unused in current implementation)
+        conn: Database connection
+        model_id: Optional model ID filter (if risk factors are model-specific)
+        limit: Optional limit on number of risk factors to load
         
     Returns:
         List of RiskFactor objects
         
     Raises:
-        Exception: Always raises to trigger sample data fallback
+        Exception if tables don't exist or query fails
     """
-    logger.info("=" * 60)
-    logger.info("Risk Factor loading from database:")
-    logger.info("  RES_DIM_* tables are not available in current schema")
-    logger.info("  Triggering fallback to sample risk factors")
-    logger.info("=" * 60)
+    logger.info("Loading risk factors from RiskPro dimension tables...")
+    if model_id:
+        logger.info(f"  Filtering by MODEL_ID = '{model_id}'")
+    if limit:
+        logger.info(f"  Limiting to {limit} records per table")
     
-    raise Exception(
-        "No RES_DIM_* tables are available in the current Regnology Risk Hub schema. "
-        "The system will use sample risk factors instead."
-    )
+    risk_factors = []
+    cursor = conn.cursor()
+    
+    # Build limit clause
+    top_clause = f"TOP {limit}" if limit else "TOP 1000"
+    
+    try:
+        # ================================================================
+        # STRATEGY:
+        # We'll query multiple RES_DIM tables and consolidate them into
+        # RiskFactor objects. The exact table structure may vary by
+        # RiskPro version, so we use error handling per table.
+        # ================================================================
+        
+        # ----- 1. Load RISK_FACTOR dimension -----
+        try:
+            logger.info("  Querying RES_DIM_RISK_FACTOR...")
+            
+            # Try the most common table pattern
+            query_rf = f"""
+            SELECT {top_clause}
+                RISK_FACTOR_ID,
+                RISK_FACTOR_NAME,
+                RISK_FACTOR_TYPE,
+                CURRENCY,
+                DESCRIPTION,
+                VAR_GROUP_ID,
+                MATRIX_CODE
+            FROM dbo.RES_DIM_RISK_FACTOR
+            ORDER BY RISK_FACTOR_ID
+            """
+            
+            cursor.execute(query_rf)
+            rf_count = 0
+            
+            for row in cursor.fetchall():
+                rf_id = str(row[0]) if row[0] else None
+                if not rf_id:
+                    continue
+                
+                rf_name = row[1] if row[1] else rf_id
+                rf_type = row[2] if row[2] else "generic"
+                currency = row[3] if row[3] else "USD"
+                description = row[4] if row[4] else f"Risk factor {rf_id}"
+                
+                # Map RiskPro type to internal factor_type
+                factor_type = map_risk_factor_type(rf_type)
+                
+                risk_factor = RiskFactor(
+                    factor_id=rf_id,
+                    factor_type=factor_type,
+                    currency=currency,
+                    name=rf_name,
+                    description=description
+                )
+                
+                # Store extended attributes for context
+                risk_factor.extended_attributes = {
+                    'source': 'RES_DIM_RISK_FACTOR',
+                    'riskpro_type': rf_type,
+                    'var_group_id': str(row[5]) if row[5] else None,
+                    'matrix_code': str(row[6]) if row[6] else None
+                }
+                
+                risk_factors.append(risk_factor)
+                rf_count += 1
+            
+            logger.info(f"    ✓ Loaded {rf_count} risk factors")
+            
+        except pyodbc.Error as e:
+            logger.warning(f"    ⚠ RES_DIM_RISK_FACTOR not available or empty: {e}")
+        
+        # ----- 2. Load CURVE dimension -----
+        try:
+            logger.info("  Querying RES_DIM_CURVE...")
+            
+            query_curve = f"""
+            SELECT {top_clause}
+                CURVE_ID,
+                CURVE_NAME,
+                CURVE_TYPE,
+                CURRENCY,
+                DESCRIPTION
+            FROM dbo.RES_DIM_CURVE
+            ORDER BY CURVE_ID
+            """
+            
+            cursor.execute(query_curve)
+            curve_count = 0
+            
+            for row in cursor.fetchall():
+                curve_id = str(row[0]) if row[0] else None
+                if not curve_id:
+                    continue
+                
+                curve_name = row[1] if row[1] else curve_id
+                curve_type = row[2] if row[2] else "yield_curve"
+                currency = row[3] if row[3] else "USD"
+                description = row[4] if row[4] else f"Curve {curve_id}"
+                
+                # Determine if yield or spread curve
+                factor_type = "spread_curve" if "spread" in curve_type.lower() else "yield_curve"
+                
+                risk_factor = RiskFactor(
+                    factor_id=curve_id,
+                    factor_type=factor_type,
+                    currency=currency,
+                    name=curve_name,
+                    description=description
+                )
+                
+                risk_factor.extended_attributes = {
+                    'source': 'RES_DIM_CURVE',
+                    'curve_type': curve_type
+                }
+                
+                risk_factors.append(risk_factor)
+                curve_count += 1
+            
+            logger.info(f"    ✓ Loaded {curve_count} curves")
+            
+        except pyodbc.Error as e:
+            logger.warning(f"    ⚠ RES_DIM_CURVE not available or empty: {e}")
+        
+        # ----- 3. Load INDEX dimension -----
+        try:
+            logger.info("  Querying RES_DIM_INDEX...")
+            
+            query_index = f"""
+            SELECT {top_clause}
+                INDEX_ID,
+                INDEX_NAME,
+                INDEX_TYPE,
+                CURRENCY,
+                DESCRIPTION
+            FROM dbo.RES_DIM_INDEX
+            ORDER BY INDEX_ID
+            """
+            
+            cursor.execute(query_index)
+            index_count = 0
+            
+            for row in cursor.fetchall():
+                index_id = str(row[0]) if row[0] else None
+                if not index_id:
+                    continue
+                
+                index_name = row[1] if row[1] else index_id
+                index_type = row[2] if row[2] else "equity_index"
+                currency = row[3] if row[3] else "USD"
+                description = row[4] if row[4] else f"Index {index_id}"
+                
+                # Map index type
+                if "fx" in index_type.lower() or "currency" in index_type.lower():
+                    factor_type = "fx_rate"
+                elif "equity" in index_type.lower() or "stock" in index_type.lower():
+                    factor_type = "equity_index"
+                else:
+                    factor_type = "macro_factor"
+                
+                risk_factor = RiskFactor(
+                    factor_id=index_id,
+                    factor_type=factor_type,
+                    currency=currency,
+                    name=index_name,
+                    description=description
+                )
+                
+                risk_factor.extended_attributes = {
+                    'source': 'RES_DIM_INDEX',
+                    'index_type': index_type
+                }
+                
+                risk_factors.append(risk_factor)
+                index_count += 1
+            
+            logger.info(f"    ✓ Loaded {index_count} indices")
+            
+        except pyodbc.Error as e:
+            logger.warning(f"    ⚠ RES_DIM_INDEX not available or empty: {e}")
+        
+        # ----- 4. Load SURF dimension (volatility surfaces) -----
+        try:
+            logger.info("  Querying RES_DIM_SURF...")
+            
+            query_surf = f"""
+            SELECT {top_clause}
+                SURF_ID,
+                SURF_NAME,
+                SURF_TYPE,
+                CURRENCY,
+                DESCRIPTION
+            FROM dbo.RES_DIM_SURF
+            ORDER BY SURF_ID
+            """
+            
+            cursor.execute(query_surf)
+            surf_count = 0
+            
+            for row in cursor.fetchall():
+                surf_id = str(row[0]) if row[0] else None
+                if not surf_id:
+                    continue
+                
+                surf_name = row[1] if row[1] else surf_id
+                surf_type = row[2] if row[2] else "volatility"
+                currency = row[3] if row[3] else "USD"
+                description = row[4] if row[4] else f"Surface {surf_id}"
+                
+                risk_factor = RiskFactor(
+                    factor_id=surf_id,
+                    factor_type="volatility_surface",
+                    currency=currency,
+                    name=surf_name,
+                    description=description
+                )
+                
+                risk_factor.extended_attributes = {
+                    'source': 'RES_DIM_SURF',
+                    'surf_type': surf_type
+                }
+                
+                risk_factors.append(risk_factor)
+                surf_count += 1
+            
+            logger.info(f"    ✓ Loaded {surf_count} surfaces")
+            
+        except pyodbc.Error as e:
+            logger.warning(f"    ⚠ RES_DIM_SURF not available or empty: {e}")
+        
+        # ----- Final validation -----
+        if len(risk_factors) == 0:
+            raise Exception(
+                "No risk factors loaded from any RES_DIM_* table. "
+                "Tables may not exist, be empty, or have different schema. "
+                "Consider using sample risk factors instead."
+            )
+        
+        logger.info(f"✓ Loaded {len(risk_factors)} total risk factors from RiskPro DB")
+        
+        # Log breakdown by source
+        sources = {}
+        for rf in risk_factors:
+            source = rf.extended_attributes.get('source', 'unknown')
+            sources[source] = sources.get(source, 0) + 1
+        for source, count in sources.items():
+            logger.info(f"    {source}: {count}")
+        
+        return risk_factors
+        
+    except Exception as e:
+        logger.error(f"✗ Error loading risk factors from database: {e}")
+        raise
+    finally:
+        cursor.close()
 
 
 def map_risk_factor_type(riskpro_type: str) -> str:
     """
-    Map Regnology Risk Hub risk factor type to internal factor_type.
+    Map RiskPro risk factor type to internal factor_type.
     
     Args:
-        riskpro_type: Type string from Regnology Risk Hub
+        riskpro_type: Type string from RiskPro
         
     Returns:
         Standardized factor_type
@@ -267,7 +515,7 @@ def load_counterparties(
     Returns:
         List of Counterparty objects
     """
-    logger.info("Loading counterparties from Regnology Risk Hub...")
+    logger.info("Loading counterparties from RiskPro...")
     if model_id:
         logger.info(f"  Filtering by MODEL_ID = '{model_id}'")
     if limit:
@@ -315,19 +563,13 @@ def load_counterparties(
             cp_class_id = str(row[4]) if row[4] else None
             cp_class = counterparty_classes.get(cp_class_id, {})
             
-            # Calculate recovery rate from LGD (Loss Given Default)
-            # Recovery Rate = 1 - LGD
-            lgd = float(row[8]) if row[8] is not None else 0.45  # Default LGD 45%
-            recovery_rate = 1.0 - lgd
-            
             counterparty = Counterparty(
                 counterparty_id=counterparty_id,
                 name=row[6] if row[6] else f"CP_{counterparty_id}",
                 country=row[2],
                 rating=cp_class.get('name', 'Unknown'),
                 sector=row[11] if row[11] else 'Unknown',
-                pd=float(row[5]) if row[5] is not None else 0.01,  # Probability of Default
-                recovery_rate=recovery_rate  # 1 - LGD
+                default_probability=float(row[5]) if row[5] is not None else 0.0
             )
             
             # Add extended attributes for rich LLM context
@@ -337,9 +579,8 @@ def load_counterparties(
                 'counterparty_class_id': cp_class_id,
                 'counterparty_class_code': cp_class.get('code'),
                 'counterparty_class_rank': cp_class.get('rank'),
-                'default_probability': float(row[5]) if row[5] is not None else 0.01,
                 'spread_curve_def': row[7],
-                'lgd_market': lgd,
+                'lgd_market': float(row[8]) if row[8] is not None else None,
                 'currency_def': row[9],
                 'is_non_performing': bool(row[10]) if row[10] is not None else False,
                 'region': row[12]
@@ -365,9 +606,9 @@ def load_counterparties(
 
 
 def map_contract_type(product_type: Optional[str]) -> ContractType:
-    """Map Regnology Risk Hub product type to ContractType enum"""
+    """Map RiskPro product type to ContractType enum"""
     if not product_type:
-        return ContractType.LOAN  # Default to LOAN instead of GENERIC
+        return ContractType.GENERIC
     
     pt = product_type.upper()
     
@@ -384,7 +625,7 @@ def map_contract_type(product_type: Optional[str]) -> ContractType:
     elif 'SWAP' in pt or 'OPTION' in pt or 'FORWARD' in pt or 'FUTURE' in pt or 'DERIVATIVE' in pt:
         return ContractType.DERIVATIVE
     else:
-        return ContractType.LOAN  # Default to LOAN instead of GENERIC
+        return ContractType.GENERIC
 
 
 def load_contracts(
@@ -403,7 +644,7 @@ def load_contracts(
     Returns:
         List of Contract objects
     """
-    logger.info("Loading contracts from Regnology Risk Hub...")
+    logger.info("Loading contracts from RiskPro...")
     if model_id:
         logger.info(f"  Filtering by MODEL_ID = '{model_id}'")
     if limit:
@@ -537,7 +778,7 @@ def load_from_riskpro(
     Args:
         model_id: Optional model ID to filter contracts and counterparties
         limit_contracts: Optional limit on number of contracts/counterparties
-        load_risk_factors_from_db_flag: If True, load from Regnology Risk Hub DB; else use sample data
+        load_risk_factors_from_db_flag: If True, load from RiskPro DB; else use sample data
         load_counterparties_flag: If True, load counterparties
         load_contracts_flag: If True, load contracts
     
@@ -550,7 +791,7 @@ def load_from_riskpro(
     logger.info("=" * 80)
     logger.info("LOADING ALM DATA FROM RISKPRO")
     logger.info("=" * 80)
-    logger.info(f"Database: {RegnologyRiskHubConfig.DB_NAME} @ {RegnologyRiskHubConfig.DB_HOST}")
+    logger.info(f"Database: {RiskProConfig.DB_NAME} @ {RiskProConfig.DB_HOST}")
     if model_id:
         logger.info(f"Model ID filter: {model_id}")
     if limit_contracts:
@@ -564,7 +805,7 @@ def load_from_riskpro(
     
     try:
         # Connect to RiskPro
-        logger.info("Connecting to Regnology Risk Hub database...")
+        logger.info("Connecting to RiskPro database...")
         conn = get_database_connection()
         
         # Step 1: Load risk factors
@@ -629,85 +870,6 @@ def load_from_riskpro(
     except Exception as e:
         logger.error(f"✗ Error loading data: {e}")
         raise
-
-
-# =============================================================================
-# UNIFIED DATA LOADING INTERFACE
-# =============================================================================
-
-def load_alm_data(
-    source: str = "db",  # "db" or "xml"
-    # DB parameters
-    model_id: Optional[str] = None,
-    limit_contracts: Optional[int] = None,
-    load_risk_factors_from_db_flag: bool = False,
-    load_counterparties_flag: bool = True,
-    load_contracts_flag: bool = True,
-    # XML parameters
-    model_xml: Optional[str] = None,
-    contracts_xml: Optional[str] = None,
-    counterparties_xml: Optional[str] = None,
-    creditrisk_xml: Optional[str] = None,
-    observations_xmls: Optional[List[str]] = None
-) -> Tuple[List[RiskFactor], List[Counterparty], List[Contract]]:
-    """
-    Unified ALM data loader - supports both database and XML sources.
-    
-    Args:
-        source: "db" for Regnology Risk Hub database, "xml" for XML files
-        
-        # DB parameters (when source="db"):
-        model_id: Optional model ID filter
-        limit_contracts: Optional limit on records
-        load_risk_factors_from_db_flag: Load risk factors from DB (else sample)
-        load_counterparties_flag: Load counterparties
-        load_contracts_flag: Load contracts
-        
-        # XML parameters (when source="xml"):
-        model_xml: Path to model XML file
-        contracts_xml: Path to contracts XML file
-        counterparties_xml: Path to counterparties XML file
-        creditrisk_xml: Path to credit risk relations XML file
-        observations_xmls: List of paths to observations XML files
-    
-    Returns:
-        Tuple of (risk_factors, counterparties, contracts)
-        
-    Raises:
-        ValueError: If source is invalid or required files are missing
-    """
-    if source == "db":
-        logger.info("Loading from Regnology Risk Hub database...")
-        return load_from_riskpro(
-            model_id=model_id,
-            limit_contracts=limit_contracts,
-            load_risk_factors_from_db_flag=load_risk_factors_from_db_flag,
-            load_counterparties_flag=load_counterparties_flag,
-            load_contracts_flag=load_contracts_flag
-        )
-    
-    elif source == "xml":
-        logger.info("Loading from XML files...")
-        
-        # Validate required files
-        if not model_xml:
-            raise ValueError("model_xml is required when source='xml'")
-        
-        return load_from_xml_files(
-            model_xml=model_xml,
-            contracts_xml=contracts_xml,
-            counterparties_xml=counterparties_xml,
-            creditrisk_xml=creditrisk_xml,
-            observations_xmls=observations_xmls or [],
-            limit_contracts=limit_contracts,
-            load_risk_factors=True,  # Always load from XML
-            load_counterparties=load_counterparties_flag,
-            load_contracts=load_contracts_flag
-        )
-    
-    else:
-        raise ValueError(f"Invalid source: {source}. Must be 'db' or 'xml'")
-
 
 
 if __name__ == "__main__":
